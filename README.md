@@ -51,7 +51,7 @@ Replace `<repo>` with the **absolute path of this repository** — configuration
 resolved relative to anything, so a relative path will not work.
 
 > ⚠️ **In JSON, every backslash must be doubled.** `"D:\code\..."` is not a valid JSON string and the
-> client will fail to load the server; `"D:\code\BLEConsole\bin\..."` is worse, because `\b` is a
+> client will fail to load the server; `"D:\code\BLEConsole-MCP\bin\..."` is worse, because `\b` is a
 > legal escape (backspace) and silently corrupts the path. Use `\\`, or simply write forward slashes
 > (`D:/code/...`), which Windows accepts and JSON does not touch.
 
@@ -95,16 +95,16 @@ args       : <repo>\mcp-server\server.mjs
 }
 ```
 
-Working configuration for a checkout at `D:\code\BLEConsole` — note the nested `BLEConsole\BLEConsole`
-folder, which is the usual place people lose a path segment:
+Working configuration for a checkout at `D:\code\BLEConsole-MCP` — note the nested
+`BLEConsole-MCP\BLEConsole` folder, which is the usual place people lose a path segment:
 
 ```json
 {
   "mcpServers": {
     "bleconsole": {
       "command": "node",
-      "args": ["D:/code/BLEConsole/mcp-server/server.mjs"],
-      "env": { "BLE_CONSOLE_PATH": "D:/code/BLEConsole/BLEConsole/bin/Release/BLEConsole.exe" }
+      "args": ["D:/code/BLEConsole-MCP/mcp-server/server.mjs"],
+      "env": { "BLE_CONSOLE_PATH": "D:/code/BLEConsole-MCP/BLEConsole/bin/Release/BLEConsole.exe" }
     }
   }
 }

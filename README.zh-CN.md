@@ -50,7 +50,7 @@ msbuild BLEConsole\BLEConsole.csproj /p:Configuration=Release /p:Platform=AnyCPU
 相对路径一定失败。
 
 > ⚠️ **JSON 里每个反斜杠都必须双写。** `"D:\code\..."` 不是合法 JSON，客户端会直接加载失败；而
-> `"D:\code\BLEConsole\bin\..."` 更隐蔽，因为 `\b` 是合法转义（退格符），路径会被悄悄改坏。
+> `"D:\code\BLEConsole-MCP\bin\..."` 更隐蔽，因为 `\b` 是合法转义（退格符），路径会被悄悄改坏。
 > 请用 `\\`，或者干脆写正斜杠（`D:/code/...`）—— Windows 接受正斜杠，JSON 也不会动它。
 
 ### DSH
@@ -93,7 +93,7 @@ args       : <仓库路径>\mcp-server\server.mjs
 }
 ```
 
-仓库位于 `D:\code\BLEConsole` 时可直接使用的配置 —— 注意 `BLEConsole\BLEConsole` 这层嵌套目录，
+仓库位于 `D:\code\BLEConsole-MCP` 时可直接使用的配置 —— 注意 `BLEConsole-MCP\BLEConsole` 这层嵌套目录，
 这是最容易漏掉一段路径的地方：
 
 ```json
@@ -101,8 +101,8 @@ args       : <仓库路径>\mcp-server\server.mjs
   "mcpServers": {
     "bleconsole": {
       "command": "node",
-      "args": ["D:/code/BLEConsole/mcp-server/server.mjs"],
-      "env": { "BLE_CONSOLE_PATH": "D:/code/BLEConsole/BLEConsole/bin/Release/BLEConsole.exe" }
+      "args": ["D:/code/BLEConsole-MCP/mcp-server/server.mjs"],
+      "env": { "BLE_CONSOLE_PATH": "D:/code/BLEConsole-MCP/BLEConsole/bin/Release/BLEConsole.exe" }
     }
   }
 }
