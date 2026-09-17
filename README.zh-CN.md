@@ -26,12 +26,19 @@ BLE 连接、当前选中的服务、以及所有通知订阅，都是**进程�
 
 ## 先构建可执行文件
 
-MCP 服务端需要一份**从本仓库源码构建**的 `BLEConsole.exe`。从 GitHub 下载的 release 二进制早于
-`--mcp` 通道，无法使用。
+MCP 服务端需要一份**从本仓库源码构建**的 `BLEConsole.exe`。上游
+[sensboston/BLEConsole](https://github.com/sensboston/BLEConsole) 的 release 二进制早于 `--mcp`
+通道，无法使用；本仓库自己 release 附件里的 `BLEConsole-MCP-*.zip` 正是从这份源码构建的，可直接用。
+
+> 📦 用的是那个压缩包？可执行文件已经在里面了 —— 直接跳到[配置](#配置)。
 
 ```powershell
 msbuild BLEConsole\BLEConsole.csproj /p:Configuration=Release /p:Platform=AnyCPU
 ```
+
+机器上没有 .NET Framework 4.8 targeting pack 时，`msbuild` 会报 `MSB3644` —— 加上
+`/p:FrameworkPathOverride="%WINDIR%\Microsoft.NET\Framework64\v4.0.30319"`，改为对已安装框架的运行时
+程序集编译即可。本仓库发布的二进制就是这么构建的。
 
 构建产物位于 `BLEConsole\bin\Release\BLEConsole.exe`。用 Visual Studio 的话，直接构建
 `BLEConsole.sln` 即可。`.csproj` 会自动解析本机最新安装的 Windows SDK；如果构建仍然报错，参见仓库

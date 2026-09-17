@@ -27,12 +27,21 @@ uses — this server is an adapter, not a reimplementation.
 
 ## Build the executable first
 
-The MCP server needs a `BLEConsole.exe` built from this source tree. A release binary downloaded from
-GitHub predates the `--mcp` transport and will not work.
+The MCP server needs a `BLEConsole.exe` built from this source tree. Binaries from the upstream
+[sensboston/BLEConsole](https://github.com/sensboston/BLEConsole) releases predate the `--mcp`
+transport and will not work — the `BLEConsole-MCP-*.zip` attached to this repository's own releases
+is built from this source and can be used as-is.
+
+> 📦 Downloading that bundle instead? The executable is already inside it — skip to
+> [Configuration](#configuration).
 
 ```powershell
 msbuild BLEConsole\BLEConsole.csproj /p:Configuration=Release /p:Platform=AnyCPU
 ```
+
+No .NET Framework 4.8 targeting pack on the machine? `msbuild` then fails with `MSB3644` — add
+`/p:FrameworkPathOverride="%WINDIR%\Microsoft.NET\Framework64\v4.0.30319"` to compile against the
+runtime assemblies of the installed framework instead. This is how the released binary is built.
 
 The build output lands in `BLEConsole\bin\Release\BLEConsole.exe`. Visual Studio users can just
 build `BLEConsole.sln`. The `.csproj` resolves the newest installed Windows SDK automatically; see

@@ -398,3 +398,6 @@ FodyWeavers.xsd
 *.sln.iml
 /CLAUDE.md
 
+# Release staging output (tools/pack-release.ps1)
+dist/
+
