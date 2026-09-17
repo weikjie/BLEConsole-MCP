@@ -45,6 +45,10 @@ The server looks for the executable in this order:
 3. `BLEConsole/bin/Debug/BLEConsole.exe`
 4. `BLEConsole.exe` at the repository root
 
+Entries 2–4 are resolved against the **server's own location** (`mcp-server/server.mjs` → the
+repository root), never against the client's working directory. A standard checkout therefore needs
+no environment variable at all, whichever client launches the server.
+
 ## Configuration
 
 Replace `<repo>` with the **absolute path of this repository** — configuration files are not
@@ -65,6 +69,9 @@ transport  : stdio
 command    : node
 args       : <repo>\mcp-server\server.mjs
 ```
+
+No `env` is needed — the server locates the executable by itself (see the search order above). Set
+`BLE_CONSOLE_PATH` only when the executable lives outside those standard locations.
 
 ### Claude Desktop
 

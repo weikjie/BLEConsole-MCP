@@ -44,6 +44,9 @@ msbuild BLEConsole\BLEConsole.csproj /p:Configuration=Release /p:Platform=AnyCPU
 3. `BLEConsole/bin/Debug/BLEConsole.exe`
 4. 仓库根目录的 `BLEConsole.exe`
 
+第 2–4 项都相对于**服务端自身**的位置解析（`mcp-server/server.mjs` 的上一级即仓库根），与客户端
+的工作目录无关。因此只要是标准 checkout，**无论用哪个客户端启动，都不需要设置任何环境变量**。
+
 ## 配置
 
 把 `<repo>`（中文版写作 `<仓库路径>`）替换成**本仓库的绝对路径** —— 配置文件不会相对于任何位置解析，
@@ -63,6 +66,9 @@ transport  : stdio
 command    : node
 args       : <仓库路径>\mcp-server\server.mjs
 ```
+
+**不需要 `env`** —— 服务端会自己定位可执行文件（见上面的查找顺序）。只有当 exe 不在上述标准位置
+时才需要设置 `BLE_CONSOLE_PATH`。
 
 ### Claude Desktop
 
