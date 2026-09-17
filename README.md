@@ -34,8 +34,9 @@ GitHub predates the `--mcp` transport and will not work.
 msbuild BLEConsole\BLEConsole.csproj /p:Configuration=Release /p:Platform=AnyCPU
 ```
 
-Visual Studio users can just build `BLEConsole.sln`. The `.csproj` resolves the newest installed
-Windows SDK automatically; see `compile_hint.txt` in the repository root if the build still complains.
+The build output lands in `BLEConsole\bin\Release\BLEConsole.exe`. Visual Studio users can just
+build `BLEConsole.sln`. The `.csproj` resolves the newest installed Windows SDK automatically; see
+`compile_hint.txt` in the repository root if the build still complains.
 
 The server looks for the executable in this order:
 

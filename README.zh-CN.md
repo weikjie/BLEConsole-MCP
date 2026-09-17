@@ -33,8 +33,9 @@ MCP 服务端需要一份**从本仓库源码构建**的 `BLEConsole.exe`。从 
 msbuild BLEConsole\BLEConsole.csproj /p:Configuration=Release /p:Platform=AnyCPU
 ```
 
-用 Visual Studio 的话，直接构建 `BLEConsole.sln` 即可。`.csproj` 会自动解析本机最新安装的 Windows
-SDK；如果构建仍然报错，参见仓库根目录的 `compile_hint.txt`。
+构建产物位于 `BLEConsole\bin\Release\BLEConsole.exe`。用 Visual Studio 的话，直接构建
+`BLEConsole.sln` 即可。`.csproj` 会自动解析本机最新安装的 Windows SDK；如果构建仍然报错，参见仓库
+根目录的 `compile_hint.txt`。
 
 服务端按以下顺序查找可执行文件：
 
