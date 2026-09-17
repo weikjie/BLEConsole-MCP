@@ -47,6 +47,14 @@ The server looks for the executable in this order:
 
 ## Configuration
 
+Replace `<repo>` with the **absolute path of this repository** — configuration files are not
+resolved relative to anything, so a relative path will not work.
+
+> ⚠️ **In JSON, every backslash must be doubled.** `"D:\code\..."` is not a valid JSON string and the
+> client will fail to load the server; `"D:\code\BLEConsole\bin\..."` is worse, because `\b` is a
+> legal escape (backspace) and silently corrupts the path. Use `\\`, or simply write forward slashes
+> (`D:/code/...`), which Windows accepts and JSON does not touch.
+
 ### DSH
 
 Settings → Plugins → MCP, or add it directly (project level writes `.dsh/`):
@@ -67,8 +75,8 @@ args       : <repo>\mcp-server\server.mjs
   "mcpServers": {
     "bleconsole": {
       "command": "node",
-      "args": ["<repo>\\mcp-server\\server.mjs"],
-      "env": { "BLE_CONSOLE_PATH": "<repo>\\BLEConsole\\bin\\Release\\BLEConsole.exe" }
+      "args": ["<repo>/mcp-server/server.mjs"],
+      "env": { "BLE_CONSOLE_PATH": "<repo>/BLEConsole/bin/Release/BLEConsole.exe" }
     }
   }
 }
@@ -81,7 +89,22 @@ args       : <repo>\mcp-server\server.mjs
   "mcpServers": {
     "bleconsole": {
       "command": "node",
-      "args": ["<repo>\\mcp-server\\server.mjs"]
+      "args": ["<repo>/mcp-server/server.mjs"]
+    }
+  }
+}
+```
+
+Working configuration for a checkout at `D:\code\BLEConsole` — note the nested `BLEConsole\BLEConsole`
+folder, which is the usual place people lose a path segment:
+
+```json
+{
+  "mcpServers": {
+    "bleconsole": {
+      "command": "node",
+      "args": ["D:/code/BLEConsole/mcp-server/server.mjs"],
+      "env": { "BLE_CONSOLE_PATH": "D:/code/BLEConsole/BLEConsole/bin/Release/BLEConsole.exe" }
     }
   }
 }
@@ -91,8 +114,11 @@ Environment variables:
 
 | Variable | Purpose |
 | --- | --- |
-| `BLE_CONSOLE_PATH` | Full path to `BLEConsole.exe`. Overrides auto-discovery. |
+| `BLE_CONSOLE_PATH` | Full path to `BLEConsole.exe`. Overrides auto-discovery. Optional — the search order above already finds `BLEConsole/bin/Release/BLEConsole.exe`, so set it only when the executable lives somewhere unusual. |
 | `BLE_CONSOLE_TIMEOUT_MS` | Per-command timeout, default `30000`. |
+
+Client-side note: most clients load MCP servers at startup, so **restart the client (or the session)
+after adding the server** — the tools will not appear until then.
 
 ## Verify
 
@@ -144,8 +170,10 @@ Bursts are coalesced every 150 ms so a fast characteristic cannot flood the clie
 
 | Symptom | Cause / fix |
 | --- | --- |
+| Client refuses to load the config / JSON parse error | Unescaped backslash in a Windows path — use `\\` or forward slashes. |
 | `did not answer the MCP handshake` | The executable predates `--mcp` — rebuild, or fix `BLE_CONSOLE_PATH`. |
-| `BLEConsole.exe not found` | Build it, or set `BLE_CONSOLE_PATH`. |
+| `BLEConsole.exe not found` | Build it, or set `BLE_CONSOLE_PATH`. Check for the nested `BLEConsole\BLEConsole\bin\...` segment. |
+| Tools never show up in the client | Restart the client; MCP servers are loaded at startup. |
 | `Access is denied` on launch | The binary carries a mark-of-the-web — run `Unblock-File BLEConsole.exe`. |
 | `Timed out waiting for "open"` | Device out of range or busy; raise `BLE_CONSOLE_TIMEOUT_MS`. |
 | `Unknown command` in a tool result | That command name does not exist; check the console `help` output. |

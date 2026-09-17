@@ -46,6 +46,13 @@ msbuild BLEConsole\BLEConsole.csproj /p:Configuration=Release /p:Platform=AnyCPU
 
 ## 配置
 
+把 `<repo>`（中文版写作 `<仓库路径>`）替换成**本仓库的绝对路径** —— 配置文件不会相对于任何位置解析，
+相对路径一定失败。
+
+> ⚠️ **JSON 里每个反斜杠都必须双写。** `"D:\code\..."` 不是合法 JSON，客户端会直接加载失败；而
+> `"D:\code\BLEConsole\bin\..."` 更隐蔽，因为 `\b` 是合法转义（退格符），路径会被悄悄改坏。
+> 请用 `\\`，或者干脆写正斜杠（`D:/code/...`）—— Windows 接受正斜杠，JSON 也不会动它。
+
 ### DSH
 
 设置 → 插件 → MCP，或直接添加：
@@ -66,8 +73,8 @@ args       : <仓库路径>\mcp-server\server.mjs
   "mcpServers": {
     "bleconsole": {
       "command": "node",
-      "args": ["<仓库路径>\\mcp-server\\server.mjs"],
-      "env": { "BLE_CONSOLE_PATH": "<仓库路径>\\BLEConsole\\bin\\Release\\BLEConsole.exe" }
+      "args": ["<仓库路径>/mcp-server/server.mjs"],
+      "env": { "BLE_CONSOLE_PATH": "<仓库路径>/BLEConsole/bin/Release/BLEConsole.exe" }
     }
   }
 }
@@ -80,7 +87,22 @@ args       : <仓库路径>\mcp-server\server.mjs
   "mcpServers": {
     "bleconsole": {
       "command": "node",
-      "args": ["<仓库路径>\\mcp-server\\server.mjs"]
+      "args": ["<仓库路径>/mcp-server/server.mjs"]
+    }
+  }
+}
+```
+
+仓库位于 `D:\code\BLEConsole` 时可直接使用的配置 —— 注意 `BLEConsole\BLEConsole` 这层嵌套目录，
+这是最容易漏掉一段路径的地方：
+
+```json
+{
+  "mcpServers": {
+    "bleconsole": {
+      "command": "node",
+      "args": ["D:/code/BLEConsole/mcp-server/server.mjs"],
+      "env": { "BLE_CONSOLE_PATH": "D:/code/BLEConsole/BLEConsole/bin/Release/BLEConsole.exe" }
     }
   }
 }
@@ -90,8 +112,10 @@ args       : <仓库路径>\mcp-server\server.mjs
 
 | 变量 | 作用 |
 | --- | --- |
-| `BLE_CONSOLE_PATH` | `BLEConsole.exe` 的完整路径，会覆盖自动查找。 |
+| `BLE_CONSOLE_PATH` | `BLEConsole.exe` 的完整路径，会覆盖自动查找。**可选** —— 上面的查找顺序本来就能命中 `BLEConsole/bin/Release/BLEConsole.exe`，只有可执行文件放在别处时才需要设置。 |
 | `BLE_CONSOLE_TIMEOUT_MS` | 单条命令超时，默认 `30000`。 |
+
+客户端注意：多数客户端在**启动时**加载 MCP 服务端，所以添加后**要重启客户端（或会话）**，否则工具不会出现。
 
 ## 验证
 
@@ -143,8 +167,10 @@ $env:BLE_SMOKE_DEVICE="你的设备名"; node mcp-server\smoke-test.mjs   # 追�
 
 | 现象 | 原因 / 处理 |
 | --- | --- |
+| 客户端报 JSON 解析错误 / 加载不了配置 | Windows 路径里的反斜杠没转义 —— 用 `\\` 或正斜杠。 |
 | `did not answer the MCP handshake` | 该可执行文件早于 `--mcp` 通道 —— 重新构建，或修正 `BLE_CONSOLE_PATH`。 |
-| `BLEConsole.exe not found` | 先构建，或设置 `BLE_CONSOLE_PATH`。 |
+| `BLEConsole.exe not found` | 先构建，或设置 `BLE_CONSOLE_PATH`。注意 `BLEConsole\BLEConsole\bin\...` 这层嵌套。 |
+| 客户端里始终看不到这些工具 | 重启客户端；MCP 服务端只在启动时加载。 |
 | 启动时报 `Access is denied` | 二进制带了「来自其他计算机」标记 —— 执行 `Unblock-File BLEConsole.exe`。 |
 | `Timed out waiting for "open"` | 设备不在范围内或被占用；调大 `BLE_CONSOLE_TIMEOUT_MS`。 |
 | 工具结果里出现 `Unknown command` | 该命令名不存在；对照控制台的 `help` 输出。 |
