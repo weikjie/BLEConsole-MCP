@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using BLEConsole.Core;
 using Windows.Devices.Enumeration;
 
 namespace BLEConsole.Utils
@@ -50,7 +51,7 @@ namespace BLEConsole.Utils
                         if (0 <= devNumber && devNumber < (collection as List<DeviceInformation>).Count)
                             result = (collection as List<DeviceInformation>)[devNumber].Id;
                         else
-                            Console.WriteLine("Device #{0:00} is out of range.", devNumber);
+                            ConsoleOutputWriter.EmitLine(string.Format("Device #{0:00} is out of range.", devNumber));
                     }
                     else
                     {
@@ -58,21 +59,20 @@ namespace BLEConsole.Utils
                             result = (collection as List<Models.BluetoothLEAttributeDisplay>)[devNumber].Name;
                     }
                 }
-                else if (!Console.IsOutputRedirected)
-                    Console.WriteLine("Invalid device number: {0}", name.Substring(1));
+                else
+                    ConsoleOutputWriter.EmitLine(string.Format("Invalid device number: {0}", name.Substring(1)));
             }
             else if (CheckForValidBluetoothAddress(name))
             {
                 var foundDevices = (collection as List<DeviceInformation>).Where(d => d.Id.ToLower().Contains(name.ToLower())).ToList();
                 if (foundDevices.Count == 0)
                 {
-                    if (!Console.IsOutputRedirected)
-                        Console.WriteLine("Can't connect to {0}.", name);
+                    ConsoleOutputWriter.EmitLine(string.Format("Can't connect to {0}.", name));
                 }
                 else if (foundDevices.Count == 1)
                     result = foundDevices.First().Id;
-                else if (!Console.IsOutputRedirected)
-                    Console.WriteLine("Found multiple devices with names starting with '{0}'. Please provide an exact name.", name);
+                else
+                    ConsoleOutputWriter.EmitLine(string.Format("Found multiple devices with names starting with '{0}'. Please provide an exact name.", name));
             }
             else
             {
@@ -81,13 +81,12 @@ namespace BLEConsole.Utils
                     var foundDevices = (collection as List<DeviceInformation>).Where(d => d.Name.ToLower().StartsWith(name.ToLower())).ToList();
                     if (foundDevices.Count == 0)
                     {
-                        if (!Console.IsOutputRedirected)
-                            Console.WriteLine("Can't connect to {0}.", name);
+                        ConsoleOutputWriter.EmitLine(string.Format("Can't connect to {0}.", name));
                     }
                     else if (foundDevices.Count == 1)
                         result = foundDevices.First().Id;
-                    else if (!Console.IsOutputRedirected)
-                        Console.WriteLine("Found multiple devices with names starting with '{0}'. Please provide an exact name.", name);
+                    else
+                        ConsoleOutputWriter.EmitLine(string.Format("Found multiple devices with names starting with '{0}'. Please provide an exact name.", name));
                 }
                 else
                 {
@@ -98,13 +97,12 @@ namespace BLEConsole.Utils
                     var foundDispAttrs = (collection as List<Models.BluetoothLEAttributeDisplay>).Where(d => d.Name.ToLower().StartsWith(name.ToLower())).ToList();
                     if (foundDispAttrs.Count == 0)
                     {
-                        if (!Console.IsOutputRedirected)
-                            Console.WriteLine("No service/characteristic found with name '{0}'.", name);
+                        ConsoleOutputWriter.EmitLine(string.Format("No service/characteristic found with name '{0}'.", name));
                     }
                     else if (foundDispAttrs.Count == 1)
                         result = foundDispAttrs.First().Name;
-                    else if (!Console.IsOutputRedirected)
-                        Console.WriteLine("Found multiple services/characteristics with names starting with '{0}'. Please provide an exact name.", name);
+                    else
+                        ConsoleOutputWriter.EmitLine(string.Format("Found multiple services/characteristics with names starting with '{0}'. Please provide an exact name.", name));
                 }
             }
             return result;

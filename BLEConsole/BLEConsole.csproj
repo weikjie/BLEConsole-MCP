@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
   <PropertyGroup>
@@ -36,6 +36,11 @@
     </NuGetPackageImportStamp>
     <IsWebBootstrapper>true</IsWebBootstrapper>
     <TargetFrameworkProfile />
+    <!-- Windows.winmd lives in a version-stamped folder under UnionMetadata; resolve the newest
+         installed Windows SDK instead of hardcoding a version (see compile_hint.txt). -->
+    <WindowsSdkRoot Condition="'$(WindowsSdkRoot)' == ''">$(Registry:HKEY_LOCAL_MACHINE\SOFTWARE\WOW6432Node\Microsoft\Windows Kits\Installed Roots@KitsRoot10)</WindowsSdkRoot>
+    <WindowsSdkRoot Condition="'$(WindowsSdkRoot)' == ''">$(Registry:HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows Kits\Installed Roots@KitsRoot10)</WindowsSdkRoot>
+    <WindowsSdkRoot Condition="'$(WindowsSdkRoot)' == ''">C:\Program Files (x86)\Windows Kits\10\</WindowsSdkRoot>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <PlatformTarget>AnyCPU</PlatformTarget>
@@ -87,6 +92,11 @@
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="Microsoft.CSharp" />
+    <Reference Include="System.Web.Extensions" />
+    <!-- Facade assemblies required for the Windows.winmd projection types. -->
+    <Reference Include="System.Runtime" />
+    <Reference Include="System.ObjectModel" />
+    <Reference Include="System.Runtime.InteropServices.WindowsRuntime" />
     <Reference Include="System.Runtime.WindowsRuntime, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
       <HintPath>C:\Windows\Microsoft.NET\assembly\GAC_MSIL\System.Runtime.WindowsRuntime\v4.0_4.0.0.0__b77a5c561934e089\System.Runtime.WindowsRuntime.dll</HintPath>
@@ -94,7 +104,10 @@
     </Reference>
     <Reference Include="Windows, Version=255.255.255.255, Culture=neutral, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
-      <HintPath>C:\Program Files (x86)\Windows Kits\10\UnionMetadata\10.0.22621.0\Windows.winmd</HintPath>
+      <!-- Windows.winmd lives in a version-stamped folder; pick the newest installed Windows SDK
+           so a freshly installed kit does not break the build (see compile_hint.txt). -->
+      <HintPath Condition="Exists('$(WindowsSdkRoot)UnionMetadata\$(TargetPlatformVersion)\Windows.winmd')">$(WindowsSdkRoot)UnionMetadata\$(TargetPlatformVersion)\Windows.winmd</HintPath>
+      <HintPath Condition="!Exists('$(WindowsSdkRoot)UnionMetadata\$(TargetPlatformVersion)\Windows.winmd')">$([System.IO.Directory]::GetDirectories('$(WindowsSdkRoot)UnionMetadata','10.*')[0])\Windows.winmd</HintPath>
       <Private>False</Private>
     </Reference>
   </ItemGroup>
@@ -124,6 +137,8 @@
     <Compile Include="Commands\UtilityCommands\QuitCommand.cs" />
     <Compile Include="Core\BleContext.cs" />
     <Compile Include="Core\IOutputWriter.cs" />
+    <Compile Include="Core\McpBridge.cs" />
+    <Compile Include="Core\OutputSink.cs" />
     <Compile Include="Enums\AttributeType.cs" />
     <Compile Include="Enums\DataFormat.cs" />
     <Compile Include="Enums\GattNativeCharacteristicUuid.cs" />

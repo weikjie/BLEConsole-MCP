@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -23,7 +23,17 @@ namespace BLEConsole
     class Program
     {
         static bool _doWork = true;
+        static bool _mcpMode = false;
         static string CLRF = (Console.IsOutputRedirected) ? "" : "\r\n";
+
+        /// <summary>
+        /// All output funnels through <see cref="OutputSink"/>, which owns the
+        /// "stay quiet when redirected" rule. In MCP bridge mode the bridge replaces the sink,
+        /// so nothing an agent needs is dropped.
+        /// </summary>
+        internal static void Write(string message) => OutputSink.Emit(message, false);
+
+        internal static void WriteLine(string message) => OutputSink.Emit(message, true);
 
         // "Magic" string for all BLE devices
         static string _aqsAllBLEDevices = "(System.Devices.Aep.ProtocolId:=\"{bb7bb05e-5972-42b5-94fc-76eaa7084d49}\")";
@@ -81,7 +91,16 @@ namespace BLEConsole
             // Get app name and version
             var name = Assembly.GetCallingAssembly().GetName();
             _versionInfo = string.Format($"{name.Name} ver. {name.Version.Major}.{name.Version.Minor}\n");
-            if (!Console.IsInputRedirected) Console.WriteLine(_versionInfo);
+
+            // MCP bridge mode: stdout carries the JSON command channel, stdin carries requests.
+            _mcpMode = args != null && args.Any(a => a.Equals("--mcp", StringComparison.OrdinalIgnoreCase));
+            if (_mcpMode)
+            {
+                OutputSink.IsBridgeMode = true;
+                CLRF = "\n";
+            }
+
+            if (!Console.IsInputRedirected && !_mcpMode) WriteLine(_versionInfo);
 
             // Set Ctrl+Break/Ctrl+C handler
             Console.CancelKeyPress += Console_CancelKeyPress;
@@ -113,8 +132,8 @@ namespace BLEConsole
             // Otherwise, quit the app
             else
             {
-                if (!Console.IsInputRedirected)
-                    Console.WriteLine("\nBLEConsole is terminated");
+                if (!_mcpMode)
+                    WriteLine("\nBLEConsole is terminated");
                 e.Cancel = false;
                 _doWork = false;
             }
@@ -252,6 +271,15 @@ namespace BLEConsole
             };
             watcher.Start();
 
+            if (_mcpMode)
+            {
+                // Bridge mode: the interactive REPL is replaced by a JSON command channel.
+                // The watcher and all BLE state live on, so subscriptions keep pushing notifications.
+                await Core.McpBridge.RunAsync(HandleSwitch);
+                watcher.Stop();
+                return;
+            }
+
             string cmd = string.Empty;
             bool skipPrompt = false;
 
@@ -259,7 +287,7 @@ namespace BLEConsole
             while (_doWork)
             {
                 if (!Console.IsInputRedirected && !skipPrompt)
-                    Console.Write("BLE: ");
+                    Write("BLE: ");
 
                 skipPrompt = false;
 
@@ -333,7 +361,7 @@ namespace BLEConsole
                 }
                 catch (Exception error)
                 {
-                    Console.WriteLine(error.Message);
+                    WriteLine(error.Message);
                 }
 
                 // We should wait for a little after writing
@@ -346,7 +374,7 @@ namespace BLEConsole
 
 
 
-        static async Task HandleSwitch(string cmd, string parameters)
+        internal static async Task HandleSwitch(string cmd, string parameters)
         {
             // Try Command Pattern registry first
             if (_commandRegistry != null)
@@ -551,7 +579,7 @@ namespace BLEConsole
                     break;
 
                 default:
-                    Console.WriteLine("Unknown command. Type \"?\" for help.");
+                    WriteLine("Unknown command. Type \"?\" for help.");
                     break;
             }
         }
@@ -561,7 +589,7 @@ namespace BLEConsole
         /// </summary>
         static void Help()
         {
-            Console.WriteLine(_versionInfo +
+            WriteLine(_versionInfo +
                 "\n  help, ?\t\t\t: show help information\n" +
                 "  quit, q\t\t\t: quit from application\n" +
                 "  list, ls [w]\t\t\t: show available BLE devices\n" +
@@ -653,7 +681,7 @@ namespace BLEConsole
                                      .Replace("%stat", (_selectedDevice.ConnectionStatus == BluetoothConnectionStatus.Connected).ToString());
                         //.Replace("%c", );
                     }
-                    Console.Write(param + CLRF);
+                    Write(param + CLRF);
                 }
             }
 
@@ -678,9 +706,8 @@ namespace BLEConsole
         {
             if (_selectedDevice == null)
             {
-                if (!Console.IsOutputRedirected)
-                {
-                    Console.WriteLine("Nothing to unpair, no BLE device connected.");
+{
+                    WriteLine("Nothing to unpair, no BLE device connected.");
                 }
                 return 1;
             }
@@ -690,18 +717,18 @@ namespace BLEConsole
                 var dur = await _selectedDevice.DeviceInformation.Pairing.UnpairAsync();
                 if (dur.Status == DeviceUnpairingResultStatus.Unpaired)
                 {
-                    Console.WriteLine("Device unpaired successfully.");
+                    WriteLine("Device unpaired successfully.");
                     SetPairingCache(_selectedDevice, false);
                 }
                 else
                 {
-                    Console.WriteLine($"Unable to unpair device: {dur.Status}");
+                    WriteLine($"Unable to unpair device: {dur.Status}");
                     return 1;
                 }
             }
             else
             {
-                Console.WriteLine("Device is NOT paired");
+                WriteLine("Device is NOT paired");
             }
             return 0;
         }
@@ -710,21 +737,20 @@ namespace BLEConsole
         {
             if (_selectedDevice == null)
             {
-                if (!Console.IsOutputRedirected)
-                {
-                    Console.WriteLine("Nothing to pair, no BLE device connected.");
+{
+                    WriteLine("Nothing to pair, no BLE device connected.");
                 }
                 return 1;
             }
 
             if (IsPaired(_selectedDevice))
             {
-                Console.WriteLine("Device is already paired");
+                WriteLine("Device is already paired");
                 return 0;
             }
             if (!_selectedDevice.DeviceInformation.Pairing.CanPair)
             {
-                Console.WriteLine("Device cannot be paired");
+                WriteLine("Device cannot be paired");
                 return 1;
             }
 
@@ -772,7 +798,7 @@ namespace BLEConsole
             }
             else
             {
-                Console.WriteLine("Invalid parameters. Please see help.");
+                WriteLine("Invalid parameters. Please see help.");
                 return 1;
             }
 
@@ -793,12 +819,12 @@ namespace BLEConsole
             if (dur.Status == DevicePairingResultStatus.Paired)
             {
                 SetPairingCache(_selectedDevice, true);
-                Console.WriteLine("Device paired successfully.");
+                WriteLine("Device paired successfully.");
             }
             else
             {
                 SetPairingCache(_selectedDevice, false);
-                Console.WriteLine($"Unable to pair device: {dur.Status}");
+                WriteLine($"Unable to pair device: {dur.Status}");
             }
 
             return dur.Status == DevicePairingResultStatus.Paired ? 0 : 1;
@@ -848,7 +874,7 @@ namespace BLEConsole
                         break;
                 }
             }
-            Console.WriteLine($"Current send data format: {_sendDataFormat.ToString()}");
+            WriteLine($"Current send data format: {_sendDataFormat.ToString()}");
         }
 
         static void ChangeReceivedDataFormat(string param)
@@ -886,16 +912,16 @@ namespace BLEConsole
                     }
                 }
             }
-            Console.Write($"Current received data format: ");
+            Write($"Current received data format: ");
             for (int dataFormat = 0; dataFormat < _receivedDataFormat.Count; dataFormat++)
             {
                 if (dataFormat == _receivedDataFormat.Count - 1)
                 {
-                    Console.WriteLine($"{_receivedDataFormat[dataFormat]}");
+                    WriteLine($"{_receivedDataFormat[dataFormat]}");
                 }
                 else
                 {
-                    Console.Write($"{_receivedDataFormat[dataFormat]}, ");
+                    Write($"{_receivedDataFormat[dataFormat]}, ");
                 }
             }
         }
@@ -923,7 +949,7 @@ namespace BLEConsole
                     }
                 }
             }
-            Console.WriteLine($"Device connection timeout (sec): {_timeout.TotalSeconds}");
+            WriteLine($"Device connection timeout (sec): {_timeout.TotalSeconds}");
         }
 
         /// <summary>
@@ -943,14 +969,14 @@ namespace BLEConsole
                 string deviceName = "";
                 string deviceId = "";
 
-                Console.WriteLine("#    Address           Name");
+                WriteLine("#    Address           Name");
                 for (int i = 0; i < orderedDevicesList.Count(); i++)
                 {
                     deviceName = orderedDevicesList[i].Name ?? "";
                     deviceName = deviceName == "" ? noAdvertisingName : deviceName;
                     deviceId = orderedDevicesList[i].Id ?? "";
                     deviceId = deviceId.Substring(Math.Max(0, deviceId.Length - bdAddressLength));
-                    Console.WriteLine($"#{i:00}: {deviceId} {deviceName}");
+                    WriteLine($"#{i:00}: {deviceId} {deviceName}");
                 }
             }
             else if (param.Replace("/", "").ToLower().Equals("w"))
@@ -985,7 +1011,7 @@ namespace BLEConsole
                         string s = "";
                         for (int i = 0; i < maxNumColumns; i++)
                             if (j < strColumn[i].Count) s += strColumn[i][j];
-                        Console.WriteLine(s.TrimEnd());
+                        WriteLine(s.TrimEnd());
                     }
                 }
             }
@@ -998,40 +1024,40 @@ namespace BLEConsole
         {
             if (_selectedDevice == null)
             {
-                Console.WriteLine("No device is connected.");
+                WriteLine("No device is connected.");
             }
             else
             {
                 if (_selectedDevice.ConnectionStatus == BluetoothConnectionStatus.Disconnected)
                 {
-                    Console.WriteLine($"Device {_selectedDevice.Name} is disconnected.");
+                    WriteLine($"Device {_selectedDevice.Name} is disconnected.");
                 }
                 else
                 {
-                    Console.WriteLine($"Device {_selectedDevice.Name} is connected" +
+                    WriteLine($"Device {_selectedDevice.Name} is connected" +
                         (IsPaired(_selectedDevice) ? " and is paired" : ", but is NOT paired"));
                     if (_services.Count() > 0)
                     {
                         // List all services
-                        Console.WriteLine("Available services:");
+                        WriteLine("Available services:");
                         for (int i = 0; i < _services.Count(); i++)
-                            Console.WriteLine($"#{i:00}: {_services[i].Name}");
+                            WriteLine($"#{i:00}: {_services[i].Name}");
 
                         // If service is selected,
                         if (_selectedService != null)
                         {
-                            Console.WriteLine($"Selected service: {_selectedService.Name}");
+                            WriteLine($"Selected service: {_selectedService.Name}");
 
                             // List all characteristics
                             if (_characteristics.Count > 0)
                             {
-                                Console.WriteLine("Available characteristics:");
+                                WriteLine("Available characteristics:");
 
                                 for (int i = 0; i < _characteristics.Count(); i++)
-                                    Console.WriteLine($"#{i:00}: {_characteristics[i].Name}\t{_characteristics[i].Chars}");
+                                    WriteLine($"#{i:00}: {_characteristics[i].Name}\t{_characteristics[i].Chars}");
 
                                 if (_selectedCharacteristic != null)
-                                    Console.WriteLine($"Selected characteristic: {_selectedCharacteristic.Name}");
+                                    WriteLine($"Selected characteristic: {_selectedCharacteristic.Name}");
                             }
                         }
                     }
@@ -1067,35 +1093,32 @@ namespace BLEConsole
                             CloseDevice();
 
                         _selectedDevice = await BluetoothLEDevice.FromIdAsync(foundId).AsTask().TimeoutAfter(_timeout);
-                        if (!Console.IsInputRedirected)
-                        {
-                            Console.WriteLine($"Connecting to {_selectedDevice.Name}. " +
+{
+                            WriteLine($"Connecting to {_selectedDevice.Name}. " +
                                 (IsPaired(_selectedDevice) ? "It is paired" : "It is NOT paired"));
                         }
 
                         var result = await _selectedDevice.GetGattServicesAsync(BluetoothCacheMode.Uncached);
                         if (result.Status == GattCommunicationStatus.Success)
                         {
-                            if (!Console.IsInputRedirected)
-                                Console.WriteLine($"Found {result.Services.Count} services:");
+    WriteLine($"Found {result.Services.Count} services:");
 
                             for (int i = 0; i < result.Services.Count; i++)
                             {
                                 var serviceToDisplay = new BluetoothLEAttributeDisplay(result.Services[i]);
                                 _services.Add(serviceToDisplay);
-                                if (!Console.IsInputRedirected)
-                                    Console.WriteLine($"#{i:00}: {_services[i].Name}");
+    WriteLine($"#{i:00}: {_services[i].Name}");
                             }
                         }
                         else
                         {
-                            Console.WriteLine($"Device {deviceName} is unreachable.");
+                            WriteLine($"Device {deviceName} is unreachable.");
                             retVal += 1;
                         }
                     }
                     catch
                     {
-                        Console.WriteLine($"Device {deviceName} is unreachable.");
+                        WriteLine($"Device {deviceName} is unreachable.");
                         retVal += 1;
                     }
                 }
@@ -1106,7 +1129,7 @@ namespace BLEConsole
             }
             else
             {
-                Console.WriteLine("Device name cannot be empty.");
+                WriteLine("Device name cannot be empty.");
                 retVal += 1;
             }
             return retVal;
@@ -1122,8 +1145,7 @@ namespace BLEConsole
 
             if (_selectedDevice != null)
             {
-                if (!Console.IsInputRedirected)
-                    Console.WriteLine($"Device {_selectedDevice.Name} is disconnected.");
+    WriteLine($"Device {_selectedDevice.Name} is disconnected.");
 
                 _services?.ForEach((s) => { s.service?.Dispose(); });
                 _services?.Clear();
@@ -1165,7 +1187,7 @@ namespace BLEConsole
                                     characteristics = result.Characteristics;
                                     _selectedService = attr;
                                     _characteristics.Clear();
-                                    if (!Console.IsInputRedirected) Console.WriteLine($"Selected service {attr.Name}.");
+                                    if (!Console.IsInputRedirected) WriteLine($"Selected service {attr.Name}.");
 
                                     if (characteristics.Count > 0)
                                     {
@@ -1176,62 +1198,54 @@ namespace BLEConsole
                                             _characteristics.Add(charToDisplay);
                                             maxNameLength = Math.Max(maxNameLength, charToDisplay.Name.Length);
                                         }
-                                        if (!Console.IsInputRedirected)
-                                        {
+{
                                             for (int i = 0; i < characteristics.Count; i++)
                                             {
                                                 var charToDisplay = new BluetoothLEAttributeDisplay(characteristics[i]);
-                                                Console.WriteLine($"#{i:00}: {charToDisplay.Name.PadRight(maxNameLength)}   {charToDisplay.Chars}");
+                                                WriteLine($"#{i:00}: {charToDisplay.Name.PadRight(maxNameLength)}   {charToDisplay.Chars}");
                                             }
                                         }
                                     }
                                     else
                                     {
-                                        if (!Console.IsOutputRedirected)
-                                            Console.WriteLine("Service doesn't have any characteristics.");
+    WriteLine("Service doesn't have any characteristics.");
                                         retVal += 1;
                                     }
                                 }
                                 else
                                 {
-                                    if (!Console.IsOutputRedirected)
-                                        Console.WriteLine("Error accessing service.");
+    WriteLine("Error accessing service.");
                                     retVal += 1;
                                 }
                             }
                             // Not granted access
                             else
                             {
-                                if (!Console.IsOutputRedirected)
-                                    Console.WriteLine("Error accessing service.");
+    WriteLine("Error accessing service.");
                                 retVal += 1;
                             }
                         }
                         catch (Exception ex)
                         {
-                            if (!Console.IsOutputRedirected)
-                                Console.WriteLine($"Restricted service. Can't read characteristics: {ex.Message}");
+    WriteLine($"Restricted service. Can't read characteristics: {ex.Message}");
                             retVal += 1;
                         }
                     }
                     else
                     {
-                        if (!Console.IsOutputRedirected)
-                            Console.WriteLine("Invalid service name or number");
+    WriteLine("Invalid service name or number");
                         retVal += 1;
                     }
                 }
                 else
                 {
-                    if (!Console.IsOutputRedirected)
-                        Console.WriteLine("Invalid service name or number");
+    WriteLine("Invalid service name or number");
                     retVal += 1;
                 }
             }
             else
             {
-                if (!Console.IsOutputRedirected)
-                    Console.WriteLine("Nothing to use, no BLE device connected.");
+    WriteLine("Nothing to use, no BLE device connected.");
                 retVal += 1;
             }
 
@@ -1278,7 +1292,7 @@ namespace BLEConsole
                             }
                             catch (Exception ex)
                             {
-                                Console.WriteLine($"Restricted service. Can't read characteristics: {ex.Message}");
+                                WriteLine($"Restricted service. Can't read characteristics: {ex.Message}");
                                 retVal += 1;
                             }
 
@@ -1290,8 +1304,7 @@ namespace BLEConsole
                     {
                         if (_selectedService == null)
                         {
-                            if (!Console.IsOutputRedirected)
-                                Console.WriteLine("No service is selected.");
+    WriteLine("No service is selected.");
                         }
                         chars = new List<BluetoothLEAttributeDisplay>(_characteristics);
                         charName = parts[0];
@@ -1308,34 +1321,34 @@ namespace BLEConsole
                             GattReadResult result = await attr.characteristic.ReadValueAsync(BluetoothCacheMode.Uncached);
 
                             if (result.Status == GattCommunicationStatus.Success)
-                                Console.WriteLine($"Read {result.Value.Length} bytes.\n{Utilities.FormatValueMultipleFormattes(result.Value, _receivedDataFormat)}");
+                                WriteLine($"Read {result.Value.Length} bytes.\n{Utilities.FormatValueMultipleFormattes(result.Value, _receivedDataFormat)}");
                             else
                             {
-                                Console.WriteLine($"Read failed: {result.Status} {Utilities.FormatProtocolError(result.ProtocolError)}");
+                                WriteLine($"Read failed: {result.Status} {Utilities.FormatProtocolError(result.ProtocolError)}");
                                 retVal += 1;
                             }
                         }
                         else
                         {
-                            Console.WriteLine($"Invalid characteristic {charName}");
+                            WriteLine($"Invalid characteristic {charName}");
                             retVal += 1;
                         }
                     }
                     else
                     {
-                        Console.WriteLine("Nothing to read, please specify characteristic name or #.");
+                        WriteLine("Nothing to read, please specify characteristic name or #.");
                         retVal += 1;
                     }
                 }
                 else
                 {
-                    Console.WriteLine("Nothing to read, please specify characteristic name or #.");
+                    WriteLine("Nothing to read, please specify characteristic name or #.");
                     retVal += 1;
                 }
             }
             else
             {
-                Console.WriteLine("No BLE device is connected.");
+                WriteLine("No BLE device is connected.");
                 retVal += 1;
             }
             return retVal;
@@ -1367,7 +1380,7 @@ namespace BLEConsole
                     var parts = param.Split(' ');
                     if (parts.Length < 2)
                     {
-                        Console.WriteLine("Insufficient data for write, please provide characteristic name and data.");
+                        WriteLine("Insufficient data for write, please provide characteristic name and data.");
                         retVal += 1;
                         return retVal;
                     }
@@ -1376,7 +1389,7 @@ namespace BLEConsole
                     string data = param.Substring(parts[0].Length + 1);
                     if (string.IsNullOrEmpty(data))
                     {
-                        Console.WriteLine("Insufficient data for write.");
+                        WriteLine("Insufficient data for write.");
                         retVal += 1;
                         return retVal;
                     }
@@ -1412,7 +1425,7 @@ namespace BLEConsole
                                 }
                                 catch (Exception ex)
                                 {
-                                    Console.WriteLine($"Restricted service. Can't read characteristics: {ex.Message}");
+                                    WriteLine($"Restricted service. Can't read characteristics: {ex.Message}");
                                     retVal += 1;
                                     return retVal;
                                 }
@@ -1422,8 +1435,7 @@ namespace BLEConsole
                         {
                             if (_selectedService == null)
                             {
-                                if (!Console.IsOutputRedirected)
-                                    Console.WriteLine("No service is selected.");
+    WriteLine("No service is selected.");
                                 retVal += 1;
                             }
                             chars = new List<BluetoothLEAttributeDisplay>(_characteristics);
@@ -1441,37 +1453,32 @@ namespace BLEConsole
                                 GattWriteResult result = await attr.characteristic.WriteValueWithResultAsync(buffer);
                                 if (result.Status != GattCommunicationStatus.Success)
                                 {
-                                    if (!Console.IsOutputRedirected)
-                                        Console.WriteLine($"Write failed: {result.Status} {Utilities.FormatProtocolError(result.ProtocolError)}");
+    WriteLine($"Write failed: {result.Status} {Utilities.FormatProtocolError(result.ProtocolError)}");
                                     retVal += 1;
                                 }
                             }
                             else
                             {
-                                if (!Console.IsOutputRedirected)
-                                    Console.WriteLine($"Invalid characteristic {charName}");
+    WriteLine($"Invalid characteristic {charName}");
                                 retVal += 1;
                             }
                         }
                         else
                         {
-                            if (!Console.IsOutputRedirected)
-                                Console.WriteLine("Please specify characteristic name or # for writing.");
+    WriteLine("Please specify characteristic name or # for writing.");
                             retVal += 1;
                         }
                     }
                     else
                     {
-                        if (!Console.IsOutputRedirected)
-                            Console.WriteLine("Incorrect data format.");
+    WriteLine("Incorrect data format.");
                         retVal += 1;
                     }
                 }
             }
             else
             {
-                if (!Console.IsOutputRedirected)
-                    Console.WriteLine("No BLE device is connected.");
+    WriteLine("No BLE device is connected.");
                 retVal += 1;
             }
             return retVal;
@@ -1517,8 +1524,7 @@ namespace BLEConsole
                             }
                             catch (Exception ex)
                             {
-                                if (!Console.IsOutputRedirected)
-                                    Console.WriteLine($"Restricted service. Can't subscribe to characteristics: {ex.Message}");
+    WriteLine($"Restricted service. Can't subscribe to characteristics: {ex.Message}");
                                 retVal += 1;
                             }
 
@@ -1530,8 +1536,7 @@ namespace BLEConsole
                     {
                         if (_selectedService == null)
                         {
-                            if (!Console.IsOutputRedirected)
-                                Console.WriteLine("No service is selected.");
+    WriteLine("No service is selected.");
                             retVal += 1;
                             return retVal;
                         }
@@ -1552,8 +1557,7 @@ namespace BLEConsole
                                 var charDisplay = new BluetoothLEAttributeDisplay(attr.characteristic);
                                 if (!charDisplay.CanNotify && !charDisplay.CanIndicate)
                                 {
-                                    if (!Console.IsOutputRedirected)
-                                        Console.WriteLine($"Characteristic {useName} does not support notify or indicate");
+    WriteLine($"Characteristic {useName} does not support notify or indicate");
                                     retVal += 1;
                                     return retVal;
                                 }
@@ -1571,54 +1575,47 @@ namespace BLEConsole
                                 {
                                     _subscribers.Add(attr.characteristic);
                                     attr.characteristic.ValueChanged += Characteristic_ValueChanged;
-                                    if (!Console.IsOutputRedirected)
-                                    {
+{
                                         if (charDisplay.CanNotify)
-                                            Console.WriteLine($"Subscribed to characteristic {useName} (notify)");
+                                            WriteLine($"Subscribed to characteristic {useName} (notify)");
                                         else
-                                            Console.WriteLine($"Subscribed to characteristic {useName} (indicate)");
+                                            WriteLine($"Subscribed to characteristic {useName} (indicate)");
                                     }
 
                                 }
                                 else
                                 {
-                                    if (!Console.IsOutputRedirected)
-                                        Console.WriteLine($"Can't subscribe to characteristic {useName}");
+    WriteLine($"Can't subscribe to characteristic {useName}");
                                     retVal += 1;
                                 }
                             }
                             else
                             {
-                                if (!Console.IsOutputRedirected)
-                                    Console.WriteLine($"Already subscribed to characteristic {useName}");
+    WriteLine($"Already subscribed to characteristic {useName}");
                                 retVal += 1;
                             }
                         }
                         else
                         {
-                            if (!Console.IsOutputRedirected)
-                                Console.WriteLine($"Invalid characteristic {useName}");
+    WriteLine($"Invalid characteristic {useName}");
                             retVal += 1;
                         }
                     }
                     else
                     {
-                        if (!Console.IsOutputRedirected)
-                            Console.WriteLine("Nothing to subscribe, please specify characteristic name or #.");
+    WriteLine("Nothing to subscribe, please specify characteristic name or #.");
                         retVal += 1;
                     }
                 }
                 else
                 {
-                    if (!Console.IsOutputRedirected)
-                        Console.WriteLine("Nothing to subscribe, please specify characteristic name or #.");
+    WriteLine("Nothing to subscribe, please specify characteristic name or #.");
                     retVal += 1;
                 }
             }
             else
             {
-                if (!Console.IsOutputRedirected)
-                    Console.WriteLine("No BLE device is connected.");
+    WriteLine("No BLE device is connected.");
                 retVal += 1;
             }
             return retVal;
@@ -1632,21 +1629,18 @@ namespace BLEConsole
         {
             if (_subscribers.Count == 0)
             {
-                if (!Console.IsOutputRedirected)
-                    Console.WriteLine("No subscription for value changes found.");
+    WriteLine("No subscription for value changes found.");
             }
             else if (string.IsNullOrEmpty(param))
             {
-                if (!Console.IsOutputRedirected)
-                    Console.WriteLine("Please specify characteristic name or # (for single subscription) or type \"unsubs all\" to remove all subscriptions");
+    WriteLine("Please specify characteristic name or # (for single subscription) or type \"unsubs all\" to remove all subscriptions");
             }
             // Unsubscribe from all value changed events
             else if (param.Replace("/", "").ToLower().Equals("all"))
             {
                 foreach (var sub in _subscribers)
                 {
-                    if (!Console.IsOutputRedirected)
-                        Console.WriteLine($"Unsubscribe from {sub.Uuid}");
+    WriteLine($"Unsubscribe from {sub.Uuid}");
                     await sub.WriteClientCharacteristicConfigurationDescriptorAsync(GattClientCharacteristicConfigurationDescriptorValue.None);
                     sub.ValueChanged -= Characteristic_ValueChanged;
                 }
@@ -1655,8 +1649,7 @@ namespace BLEConsole
             // unsubscribe from specific event
             else
             {
-                if (!Console.IsOutputRedirected)
-                    Console.WriteLine("Not supported, please use \"unsubs all\"");
+    WriteLine("Not supported, please use \"unsubs all\"");
             }
         }
 
@@ -1669,8 +1662,13 @@ namespace BLEConsole
         {
             var newValue = Utilities.FormatValueMultipleFormattes(args.CharacteristicValue, _receivedDataFormat);
 
-            if (Console.IsInputRedirected) Console.Write($"{newValue}");
-            else Console.Write($"Value changed for {sender.Uuid} ({args.CharacteristicValue.Length} bytes):\n{newValue}\nBLE: ");
+            // In bridge mode the notification is pushed as its own JSON event instead of polluting
+            // whatever command response is currently being captured.
+            if (_mcpMode)
+                Core.McpBridge.EmitNotification(sender, args, newValue);
+            else if (Console.IsInputRedirected) Write($"{newValue}");
+            else Write($"Value changed for {sender.Uuid} ({args.CharacteristicValue.Length} bytes):\n{newValue}\nBLE: ");
+
             if (_notifyCompleteEvent != null)
             {
                 _notifyCompleteEvent.Set();

@@ -1,3 +1,5 @@
+using System;
+
 namespace BLEConsole.Core
 {
     /// <summary>
@@ -12,33 +14,40 @@ namespace BLEConsole.Core
     }
 
     /// <summary>
-    /// Console implementation of IOutputWriter
+    /// Console implementation of IOutputWriter.
+    /// All output goes through <see cref="OutputSink"/>, which owns the "suppress when redirected"
+    /// rule. In MCP bridge mode the sink is replaced, so the historical IsOutputRedirected /
+    /// IsInputRedirected guards no longer swallow the messages an agent needs.
     /// </summary>
     public class ConsoleOutputWriter : IOutputWriter
     {
-        public bool IsRedirected => System.Console.IsOutputRedirected;
+        /// <summary>
+        /// False in bridge mode: output is captured and part of the tool result, so there is
+        /// nothing to redirect away from.
+        /// </summary>
+        public bool IsRedirected => OutputSink.Handler == null && Console.IsOutputRedirected;
 
         public void Write(string message)
         {
-            if (!System.Console.IsOutputRedirected)
-                System.Console.Write(message);
+            OutputSink.Emit(message, false);
         }
 
         public void WriteLine(string message)
         {
-            if (!System.Console.IsOutputRedirected)
-                System.Console.WriteLine(message);
+            OutputSink.Emit(message, true);
         }
 
         public void WriteError(string message)
         {
-            if (!System.Console.IsOutputRedirected)
-            {
-                var oldColor = System.Console.ForegroundColor;
-                System.Console.ForegroundColor = System.ConsoleColor.Red;
-                System.Console.WriteLine(message);
-                System.Console.ForegroundColor = oldColor;
-            }
+            OutputSink.Emit(message, true);
+        }
+
+        /// <summary>
+        /// Static shortcut for code that has no IOutputWriter at hand (e.g. Utilities).
+        /// </summary>
+        public static void EmitLine(string message)
+        {
+            OutputSink.Emit(message, true);
         }
     }
 }

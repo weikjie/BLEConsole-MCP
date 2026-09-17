@@ -397,3 +397,6 @@ FodyWeavers.xsd
 # JetBrains Rider
 *.sln.iml
 /CLAUDE.md
+
+# Release binary downloaded from upstream - predates the --mcp transport, build from source instead
+/BLEConsole.exe

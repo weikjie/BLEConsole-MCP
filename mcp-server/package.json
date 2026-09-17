@@ -1,0 +1,31 @@
+{
+  "name": "bleconsole-mcp",
+  "version": "1.0.0",
+  "description": "MCP server exposing the BLEConsole Bluetooth LE command set to agents (Windows, stdio transport, no runtime dependencies)",
+  "type": "module",
+  "bin": {
+    "bleconsole-mcp": "server.mjs"
+  },
+  "main": "server.mjs",
+  "files": [
+    "server.mjs",
+    "bridge.mjs",
+    "tools.mjs",
+    "smoke-test.mjs"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "start": "node server.mjs",
+    "smoke": "node smoke-test.mjs"
+  },
+  "keywords": [
+    "mcp",
+    "bluetooth",
+    "ble",
+    "gatt",
+    "windows"
+  ],
+  "license": "MIT"
+}

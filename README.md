@@ -1,173 +1,168 @@
-# BLEConsole
+# BLEConsole MCP server
 
-Windows command-line tool for interacting with Bluetooth LE devices
+A local [MCP](https://modelcontextprotocol.io) server that exposes
+[sensboston/BLEConsole](https://github.com/sensboston/BLEConsole) — a Windows command-line tool for
+Bluetooth LE — to AI agents. Claude Desktop, Cursor, DSH or any MCP client can scan, connect to and
+talk to BLE devices through 22 tools.
 
-<img width="2650" height="2060" alt="image" src="https://github.com/user-attachments/assets/0d580dca-bb7a-4b7d-b30a-6dd4ae5a8040" />
+Zero runtime dependencies — only Node ≥ 18 and a `BLEConsole.exe` built from this repository.
 
-## Version 2.1 - Enhanced Pairing and Usability
+> 📄 The original command-line documentation lives in **[README-BLEConsole.md](README-BLEConsole.md)**.
 
-**New in v2.1:**
-- **Smart Auto-Pairing**: Automatic pairing when connecting with `open device [pin]`
-- **Interactive PIN Input**: Support for devices that display random PIN (DisplayOnly IO capability)
-- **Endianness Control**: New `endian` command for byte order (Little/Big Endian)
-- **Improved `pair` command**: Direct PIN input (`pair 123456`), all pairing modes supported
-- **Improved `unsubs` command**: Unsubscribe from specific characteristic or all at once
-- **Pairing Status Display**: `stat` command shows pairing information
-- **Better Error Messages**: Improved English and consistency across all commands
-
-**Previous in v2.0:**
-- Complete refactoring with Command Pattern architecture
-- Descriptor support (read/write GATT descriptors)
-- MTU information display
-- Fast writes (WriteWithoutResponse via `write -nr`)
-- Batch read operations (`read-all`)
-- Device Information Service helper (`device-info`)
-- Enhanced characteristic properties display
-
-### Requirements
-
-Windows 10, BT 4.0 adapter
-
-### Console Commands
-
-#### General Commands
-- **help**, **?**: show help information
-- **quit**, **q**: quit from application
-- **list**, **ls** `[w]`: show available BLE devices (`w` for wide format with full IDs)
-- **open** `<name|#|addr>` `[pin]`: connect to BLE device, with optional pairing PIN
-- **close**: disconnect from currently connected device
-- **stat**, **st**: show current BLE device status and pairing information
-- **timeout** `<sec>`: show/change connection timeout (default: 3 sec)
-- **delay** `<msec>`: pause execution for a certain number of milliseconds
-
-#### Data Format Commands
-- **format**, **fmt** `[format]`: show/change display format (ASCII/UTF8/Dec/Hex/Bin)
-- **format_send**, **fmts** `[format]`: show/change send data format
-- **format_rec**, **fmtr** `[format,...]`: show/change received data format (comma-separated list)
-- **endian**, **bo** `[little|big]`: show/change byte order for read/write operations
-
-#### GATT Operations
-- **set** `<service_name|#>`: set current service for read/write operations
-- **read**, **r** `<name>`**: read value from characteristic
-- **read-all**, **ra** `[service]`: read all characteristics in a service
-- **write**, **w** `[-nr]` `<name>`** `<value>`: write value to characteristic (`-nr` for WriteWithoutResponse)
-- **subs** `<name>`**: subscribe to value change notifications
-- **unsubs** `[<name>**|all]`: unsubscribe from specific characteristic or all (default: all)
-- **wait**: wait for notification event
-
-#### Descriptor Commands
-- **desc** `<name>`: list all descriptors for a characteristic
-- **read-desc**, **rd** `<char>/<desc>`: read descriptor value
-- **write-desc**, **wd** `<char>/<desc>` `<value>`: write descriptor value
-
-#### Device Information
-- **mtu**: show current MTU size
-- **device-info**, **di**, **info**: read Device Information Service
-
-#### Pairing Commands
-- **pair** `[<pin>]`: pair with optional PIN
-- **pair** `mode=ProvidePin` `[pin]`: pair with PIN (interactive if not provided)
-- **pair** `mode=ConfirmOnly`: pair with confirmation only
-- **pair** `mode=DisplayPin`: pair when device displays PIN
-- **pair** `mode=ConfirmPinMatch`: pair with PIN matching confirmation
-- **unpair**: unpair currently connected device
-
-#### Scripting Commands
-- **print**, **p** `<text&vars>`*: print text and variables to stdout
-  - `%id` - Bluetooth device ID
-  - `%addr` - device BT address
-  - `%mac` - device MAC address
-  - `%name` - device Bluetooth name
-  - `%stat` - device connection status
-  - `%NOW, %now, %HH, %hh, %mm, %ss, %D, %d, %T, %t, %z` - date/time variables
-- **foreach** `[device_mask]`: start device enumeration loop
-- **endfor**: end foreach loop
-- **if** `<cmd>` `<params>`: start conditional block
-- **elif**: alternative condition block
-- **else**: else block
-- **endif**: end conditional block
-
-_* You can use standard C escape characters like \t, \n etc._
-
-_** `<name>` can be "service/characteristic", characteristic name, or # index_
-
-### Examples
-
-#### Connect with PIN pairing
 ```
-BLE: open ESP32_Device 123456
-Connecting to ESP32_Device. It is not paired.
-Attempting to pair with PIN...
-Pairing successful.
-Found 3 services:
-#00: GenericAccess
-#01: GenericAttribute
-#02: Custom Service
+MCP client ──stdio/JSON-RPC──▶ server.mjs ──NDJSON──▶ BLEConsole.exe --mcp ──▶ WinRT Bluetooth LE
 ```
 
-#### Interactive PIN pairing (device displays PIN)
-```
-BLE: open MyDevice
-Connecting to MyDevice. It is not paired.
-Attempting to pair...
-Device is displaying a PIN. Enter the PIN shown on the device:
-PIN: 847293
-Pairing successful.
-```
+## Why a bridge instead of a wrapper
 
-#### Subscribe and unsubscribe
-```
-BLE: set #2
-Selected service Custom Service.
-#00: NotifyChar   N
-#01: WriteChar    W
+The BLE connection, the selected service and the notification subscriptions are all state inside one
+process. Spawning `BLEConsole.exe` per tool call would reconnect the device and silently drop every
+subscription, so the server keeps **one long-lived child process** for the whole session.
 
-BLE: subs #0
-Subscribed to characteristic NotifyChar (notify)
+The child runs in `--mcp` mode, which replaces the interactive REPL with a newline-delimited JSON
+command channel. The command set, the BLE logic and the output text are exactly the ones the console
+uses — this server is an adapter, not a reimplementation.
 
-BLE: unsubs #0
-Unsubscribed from NotifyChar.
+## Build the executable first
 
-BLE: unsubs
-Unsubscribed from 0 characteristic(s).
+The MCP server needs a `BLEConsole.exe` built from this source tree. A release binary downloaded from
+GitHub predates the `--mcp` transport and will not work.
+
+```powershell
+msbuild BLEConsole\BLEConsole.csproj /p:Configuration=Release /p:Platform=AnyCPU
 ```
 
-#### Change byte order for numeric data
+Visual Studio users can just build `BLEConsole.sln`. The `.csproj` resolves the newest installed
+Windows SDK automatically; see `compile_hint.txt` in the repository root if the build still complains.
+
+The server looks for the executable in this order:
+
+1. `$env:BLE_CONSOLE_PATH`
+2. `BLEConsole/bin/Release/BLEConsole.exe`
+3. `BLEConsole/bin/Debug/BLEConsole.exe`
+4. `BLEConsole.exe` at the repository root
+
+## Configuration
+
+### DSH
+
+Settings → Plugins → MCP, or add it directly (project level writes `.dsh/`):
+
 ```
-BLE: endian big
-Byte order set to Big Endian.
-
-BLE: format hex
-Current send data format: Hex
-Current received data format: Hex
-
-BLE: read #0
-hex:    00 01 02 03
-```
-
-#### Batch script example
-```
-// Loop through all devices
-foreach
-
-    // Connect and if successful
-    if open $
-
-        // Read device name
-        read #0/#0
-
-        // Close connection
-        close
-    endif
-
-endfor
+serverName : bleconsole
+transport  : stdio
+command    : node
+args       : <repo>\mcp-server\server.mjs
 ```
 
-### Notes
+### Claude Desktop
 
-- Blank/empty lines in scripts are ignored
-- Comments can be added with `//`
-- Device list shows devices Windows has seen recently (not all may be currently available)
-- You can use partial device names if unique (e.g., `open ESP` instead of `open ESP32_Device`)
+`%APPDATA%\Claude\claude_desktop_config.json`:
 
+```json
+{
+  "mcpServers": {
+    "bleconsole": {
+      "command": "node",
+      "args": ["<repo>\\mcp-server\\server.mjs"],
+      "env": { "BLE_CONSOLE_PATH": "<repo>\\BLEConsole\\bin\\Release\\BLEConsole.exe" }
+    }
+  }
+}
+```
 
+### Cursor / VS Code
+
+```json
+{
+  "mcpServers": {
+    "bleconsole": {
+      "command": "node",
+      "args": ["<repo>\\mcp-server\\server.mjs"]
+    }
+  }
+}
+```
+
+Environment variables:
+
+| Variable | Purpose |
+| --- | --- |
+| `BLE_CONSOLE_PATH` | Full path to `BLEConsole.exe`. Overrides auto-discovery. |
+| `BLE_CONSOLE_TIMEOUT_MS` | Per-command timeout, default `30000`. |
+
+## Verify
+
+```powershell
+node mcp-server\smoke-test.mjs                      # protocol + device discovery
+$env:BLE_SMOKE_DEVICE="YourDevice"; node mcp-server\smoke-test.mjs   # adds a real connect/read/close flow
+```
+
+## Tools
+
+`ble_list_devices` → `ble_open` → `ble_select_service` → `ble_characteristics` → `ble_read` / `ble_write`
+is the normal flow. Indices (`#0`) and names are both accepted wherever a device, service or
+characteristic is expected.
+
+| Tool | Purpose |
+| --- | --- |
+| `ble_list_devices` | Devices Windows has seen recently, with the `#NN` index. |
+| `ble_open` | Connect + enumerate GATT services. Auto-pairs; pass `pin` if the device demands one. |
+| `ble_close` | Disconnect and drop subscriptions. |
+| `ble_status` | Current device, pairing state, selected service/characteristic. |
+| `ble_services` | Services of the connected device. |
+| `ble_select_service` | Select a service (loads its characteristics). |
+| `ble_characteristics` | Characteristics of the selected service, with property letters. |
+| `ble_read` / `ble_read_all` | Read one characteristic / every characteristic in a service. |
+| `ble_write` | Write a characteristic; `withoutResponse: true` for fast writes. |
+| `ble_subscribe` / `ble_unsubscribe` | Notification subscriptions. |
+| `ble_wait_notification` | Block for the next pushed value. |
+| `ble_device_info` | Standard Device Information Service. |
+| `ble_pair` | Pair (optional `pin`) or `unpair: true`. |
+| `ble_list_descriptors` / `ble_read_descriptor` / `ble_write_descriptor` | GATT descriptors. |
+| `ble_mtu` | Negotiated ATT MTU. |
+| `ble_set_config` | Send/receive formats, byte order, connection timeout. |
+| `ble_raw` | Escape hatch: run any console command verbatim. |
+| `ble_bridge_status` | Bridge process diagnostics — call this first when something misbehaves. |
+
+### Notifications
+
+Subscribed values are pushed to the client as MCP log notifications on channel `ble/notification`:
+
+```json
+{ "level": "info", "logger": "bleconsole-mcp",
+  "data": { "channel": "ble/notification",
+            "values": [{ "char": "…", "len": 4, "data": "hex:\t01 02 03 04" }] } }
+```
+
+Bursts are coalesced every 150 ms so a fast characteristic cannot flood the client.
+
+## Troubleshooting
+
+| Symptom | Cause / fix |
+| --- | --- |
+| `did not answer the MCP handshake` | The executable predates `--mcp` — rebuild, or fix `BLE_CONSOLE_PATH`. |
+| `BLEConsole.exe not found` | Build it, or set `BLE_CONSOLE_PATH`. |
+| `Access is denied` on launch | The binary carries a mark-of-the-web — run `Unblock-File BLEConsole.exe`. |
+| `Timed out waiting for "open"` | Device out of range or busy; raise `BLE_CONSOLE_TIMEOUT_MS`. |
+| `Unknown command` in a tool result | That command name does not exist; check the console `help` output. |
+
+## Protocol reference
+
+Bridge wire format between `server.mjs` and `BLEConsole.exe --mcp`:
+
+```jsonc
+// request
+{"id":1,"cmd":"read","args":"#0"}
+// response
+{"id":1,"ok":true,"exit":0,"lines":["Read 4 bytes.","hex: 01 02 03 04"]}
+// asynchronous event (no id)
+{"notify":"value","char":"…uuid…","len":4,"data":"hex: 01 02 03 04"}
+```
+
+`exit` mirrors the console's ERRORLEVEL, so `ok:false`/non-zero marks a failed command.
+
+## License
+
+MIT, same as the upstream [BLEConsole](https://github.com/sensboston/BLEConsole) project — see
+[LICENSE](LICENSE).
