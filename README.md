@@ -1,5 +1,7 @@
 # BLEConsole MCP server
 
+**English** | [简体中文](README.zh-CN.md)
+
 A local [MCP](https://modelcontextprotocol.io) server that exposes
 [sensboston/BLEConsole](https://github.com/sensboston/BLEConsole) — a Windows command-line tool for
 Bluetooth LE — to AI agents. Claude Desktop, Cursor, DSH or any MCP client can scan, connect to and

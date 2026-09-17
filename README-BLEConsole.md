@@ -1,10 +1,11 @@
-> **📄 这是项目原有的 README（原版 BLEConsole 文档）。**
-> 本仓库现在的主入口是 **[MCP server](README.md)** —— 让 AI Agent 通过
+> **📄 这是项目原有的 README（原版 BLEConsole 命令行文档，英文）。**
+> 本仓库现在的主入口是 **[MCP server](README.md)**（[简体中文](README.zh-CN.md)）—— 让 AI Agent 通过
 > [Model Context Protocol](https://modelcontextprotocol.io) 调用 BLEConsole。
 > 下面这份文档是 BLEConsole 命令行工具本身的完整说明，仍然完全有效。
 >
-> 📄 *This is the original README of the BLEConsole project. The repository's main entry point is
-> now the [MCP server](README.md); the command-line reference below is unchanged and still valid.*
+> 📄 *This is the original README of the BLEConsole project (English). The repository's main entry
+> point is now the [MCP server](README.md) ([简体中文](README.zh-CN.md)); the command-line reference
+> below is unchanged and still valid.*
 
 ---
 
@@ -196,5 +197,4 @@ endfor
 - Comments can be added with `//`
 - Device list shows devices Windows has seen recently (not all may be currently available)
 - You can use partial device names if unique (e.g., `open ESP` instead of `open ESP32_Device`)
-
 
